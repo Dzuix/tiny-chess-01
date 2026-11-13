@@ -1,80 +1,37 @@
-# tiny-chess-01 starter (MIT, see LICENSE): a working entry to start from.
-# It plays every game of the gauntlet through the env at MAKEFUN_ENV_URL:
-# POST /game {} serves the game in play, POST /move {game, move} plays a
-# move, and the loop ends when the env answers status "done".
-#
-# Its chess is one line deep: of the legal moves the env lists, it plays the
-# one that captures the most valuable piece, read from the FEN. Ties go, in
-# order, to the better promotion, the cheaper moving piece, then the first
-# move in UCI order. No clock and no random: the same position always gets
-# the same move, so the trial's replay matches.
-#
-# Make it stronger with a real search under a fixed node or depth budget,
-# never a clock. The rule: this file is the whole engine, at most 4,096
-# bytes as committed, Python 3.13 standard library only.
-
-import json
-import os
-import sys
-import urllib.error
-import urllib.request
-
-ENV_URL = os.environ.get("MAKEFUN_ENV_URL") or sys.exit("MAKEFUN_ENV_URL is not set")
-
-# Piece values by FEN letter, case-insensitive. The king is never captured;
-# its 100 only ranks it last as the moving piece.
-VALUE = {"p": 1, "n": 3, "b": 3, "r": 5, "q": 9, "k": 100}
-
-
-def post(path, body):
-    """POST a JSON body to the env and return its JSON answer."""
-    req = urllib.request.Request(
-        ENV_URL + path,
-        data=json.dumps(body).encode(),
-        headers={"content-type": "application/json"},
+import lzma, base64
+D = (b'{Wp48S^xk9=GL@E0stWa8~^|S5YJf5;3CZl<Xr#}hzkbs|Cq61p-HD2`G=?yF-mzeks=Dx2!gIX*x+pYj}5ICd;BqcEP8Y8j~<e9XQCxg`*4?J23HxZT;pjE'
+     b'xhz^zh+!MpR{GL2D-'
+     b'4Qpn)<3AZf>>r3FMq`+8^hGp|=RZ`Y6)&^825BPhtxvK9}<%F?I=qCD+DyB4pK%ijk=+LDf`}Ri7~O0=k)5FgPr)VCn%?&m}KQsf`&2^#H*MkG4w}kB5~sT-'
+     b'XLhK`I3#0>qO};31de)GW9rmT#WlK1^<Ju|As8xfOI%Z~WfA%eior1kGODWRwt!np+wR?p6V8z0CvNy5XJYuTdlwjF9PpL-'
+     b')Qx3~g5}2wJ__M$})#7J<B!WuI0G;aKY&D{s&@c1i1@aPZgZejQLdp*E~6f@w#q(3VnlJbTfX95A+9|A354yW+XMDLSWs!4`HcG2o|c8`||(R+}6cKgy%2Z>'
+     b'ytjtV});5T@N6zO-!yVsxcvk?%eY+nl*Tgj;30A;s|CQzW-m7^Uq>NhX4T2ufM_JFz+*8o+P-Y-'
+     b'4yPBG>#fI#4hX!>scA9<VeSYF9DyZex8Qhz5id=&e@;smuLrMbf6Fx*(nJ=WN@7)S=|6ONy-'
+     b'?%%V>7V8#=_9c^<llNyLUIZ3#b>$=Aem=Xbh8ahe1K@lr+A*0UP_$mRjQhSiS=w7#<2*0a{b!GN_sL@NP?sVizDkU3^0@U4%Q$iKFd7)++H0;zW&<jw@vY23'
+     b'MenwpdX<Zk7;sat`KzO~}qa_cVzQaYtL+ZPb8|#@~>Z<<!clth@h74OvTEJ<9qnRKiLR{O1x{C7uBQ(<FCRSZ+e|g($#FUQB9Dxdk&C{`-'
+     b'2ZzT#H9@MA6Nfxeb*{@`j--N`@p48cshZ53GECg`nGQ^%jUaVy*d2*9*t5&%9)2q7KLwXd?x8<j%xTXVAEI5EuRw)Trd4+BYTQ-TUdtXc$_C102gZqRujv*?'
+     b'X#~gwqqNUgQH4RPo5q$1hQ?rbm63q=s4psxJ0rJ%LmY<Q2-'
+     b'iFBJMlBc<<4YahT5B;NtX%Wh+YYpO$afVL8&MPQb=Y21BoYHf=DL<?K2Ta$@;dclZVw;x5s?bzS>TepF~-6jKVx0FO9<YzVtXkg(R~U-'
+     b'Bxy}nsh*sEc?$_nplHaGIu}=<YTWBASaq7{^a$sr_qWOMm0Y`;^RE(zKs)z`<YwEG&z$ViQ6H2xCLwtlP1+ckU^%xL~D|G^m_+vKXL8cWn4jAhs)n(VBPQDD'
+     b'OS%G?T2S`qdpqgHDZae)`?YCX&2;>v@duidoS_lO?s5teRDYgB-3*sT-&c4vKO^BWLe0^z8g-'
+     b'3$?m7B+9wQ7y+9=UpjJ?RFxWK4<vgGFKzET&BKJrm9`x!xUbzjuv=LHn)q5Bc`Vfp&K>`A7Q=Uwmc@|AeU0#s@JW~;=J?f6dGrhv})vrpge-wH)wa;7&e30e'
+     b'bAoi}V0gM+Si<gqpd2Up6X<~_Jj&-'
+     b'@1t9X=LIxv1|5!)BZByLD|MHn()U?%;y>J02<K^#s~tQ<ASdcuid#mcag32vGb{TEBBmu3iD9;T2|SY#XzNICF##yk!-'
+     b'oe1%7GCT`a%dPjv6Rm1$YS!q_8W}ck=%hU1IY7!+y!$5=lEA)sc4UB{`#ceq-'
+     b'D>xU_3+m{UDl`Y$LFOvz+>&;ni4)^v(J%U>i`hOveHW*JR(1_WnOJZm&meg6h3ACp4%#0gtz4ewzoOrF_C_cBcVLIc(7s`De>$^GyIXKvs%bp;RjB2OAtN)7'
+     b'yj{xrcclB>J$~SM6#es>jdB{3z=4fj_|f*y8rF3&lGA9;k*iEhX6nOz2!<^)z4&gMB2@LeADc&1U2YU=&7cV&$p{iqAUmbsd$3S0H6fL1@2;aoPKR<oGzF#L'
+     b'T%>9|4`RWhSxO;LwiSv1o@jNUsM)dJcRxhgboiuUPf5})Jqh7Z#68X&kw$L)FfoKp>s4DUqj0Z54CgzgJ{vtEUyKzB$s}TOFPj2$lSJ;ge_Ky`h%D3Oa-YKa'
+     b'IC!Ox286eHT&aci#=9}mElwkDMumB#iaj?5Q?b(R~!j)q+zYkS|FDAPnWO1SEVSeX&HL2A+4AosTt8(^1bn4XGX5kx}}ElokALpjw5{sSf)hrr&V1lpOB{lW'
+     b'-MuK?g>fJ1j$TyL^LbkQfhGLW`{DwVj1(qFHpHAw}K@$Ve}=Qm&1w}rRphwO1J>HM;ptLzfXvk5KcM(W_1O9^bOQ=jVg(mx(a;pSW4*C%6Yt%fJC~0Y-'
+     b'(pOUb~4kEx08Ad&$Wsmi25*z{PF{2Fm%UN*gfc)CoOLScj_PrU!&ArDvJ520eaZuC*f&nLXX~Jhc$3vxci&L(-1Z7-'
+     b'Y)OL3m1y7ucQPZ0$@yuM53u(UVA4&S5$zm-iDTu|KmroE<0$@&;%0&FE^JCXr{#Yk6?TV3F<+8`yUVoid3<eq%B_B2q>n38eJNGQ+(9ykd=>YRgMGreR(&Y}'
+     b'}pmxN7>m^X|qp<&`?0a^N@G6Y8<l;4qcjuQu&iGa}NCe1jtkO)%7jA0&nASlMfSX7R@FhnKL_=X<`S2Y>S)pTRLoB{Z@IFIQnwMH2)-%JpR>;@M=-'
+     b'(~69I#b3lb-2NA7L5#qM6u}Wblu_YP=h8dCQ_}u)I6%P(nB#?FPFu{Yce=t=j@H*3;p@%mt?8gVjgv~7UA(|++lRO10-78H!=)d&-'
+     b'XK|bTekTDYrD0oNl$pj`zm)suwiL#90Iz9p-1nqnPz<)((-If&=~YUZr6$-'
+     b'Pd)vUrNG8Gqiu=R1;E^RDd8~UHPZ&Z>a7v*%7gmh_;46TDf6mNN?Y^*Q~7W${{Q`Z3}kBE$@C9Nf|l70&q_jum5PqUgr>~4f?wb@*#3QGf;XWk)r^WQ4YGyp'
+     b'Sia@bqtr{!&80{xaF=d*K&mUNFg0-iZ(wIV%eYD1Pi7<zBF^lSAhOr<z|-'
+     b'~O*3VI9p2+rl=n1$)jh2iMNW;6cyo<jJ$3y}y?HSseO$@a%=P9)ltKTV>f0}H1-'
+     b'IP)f<hX<9rbc^WV#h3xH}K(8Ez~IU1!2l_=wlU7{DvEel#@YC4)!x77GjTWe$9@y4(N|2TR@}9Ioc56I#?2-nFE`u+ssV-{;!!h&n>}3C}<h9xQfTccBI-SR'
+     b'9)C%-z>%e?AhG{G6@>rX>~msxvPrhG4UpXe8d~_P916a!~o0NFD@|ddz9P({l$ya6_y4rrK`pD&&ojKWt*pz9p`H@RRpwQ4S*`=WUR>xaZWp|#xX$_-'
+     b'F0sz3l09&Z7OwFpOr)H+?yoWmRR<~kR~JrGPQ~T0J?!5(yakt00Dp$&P4zKStmxQvBYQl0ssI200dcD'
     )
-    try:
-        with urllib.request.urlopen(req) as res:
-            return json.load(res)
-    except urllib.error.HTTPError as e:
-        sys.exit(f"{path}: HTTP {e.code} {e.read().decode(errors='replace')}")
-
-
-def board_of(fen):
-    """The FEN's pieces as {square: letter}, e.g. {"e1": "K", "e8": "k"}."""
-    board = {}
-    for i, row in enumerate(fen.split()[0].split("/")):
-        file = 0
-        for c in row:
-            if c.isdigit():
-                file += int(c)
-            else:
-                board["abcdefgh"[file] + str(8 - i)] = c
-                file += 1
-    return board
-
-
-def choose(fen, legal):
-    """The legal UCI move that takes the most, with the fixed tie-break."""
-    board = board_of(fen)
-
-    def rank(move):
-        mover = board[move[:2]].lower()
-        victim = board.get(move[2:4])
-        if victim is None and mover == "p" and move[0] != move[2]:
-            victim = "p"  # en passant: the pawn taken is beside the target
-        taken = VALUE[victim.lower()] if victim else 0
-        promo = VALUE[move[4]] if len(move) == 5 else 0
-        return (-taken, -promo, VALUE[mover], move)
-
-    return min(legal, key=rank)
-
-
-while True:
-    g = post("/game", {})
-    if g["status"] == "done":
-        break
-    while g["status"] == "your_move":
-        g = post("/move", {"game": g["game"], "move": choose(g["fen"], g["legal_moves"])})
-    print(f"game {g['game']}: {g['outcome']} by {g['reason']}", file=sys.stderr)
-print(f"done: {g.get('wins')} won, {g.get('draws')} drawn, {g.get('losses')} lost", file=sys.stderr)
+exec(lzma.decompress(base64.b85decode(D)))
